@@ -1,0 +1,217 @@
+// ==UserScript==
+// @name        Search For AmemberPost
+// @namespace        http://tampermonkey.net/
+// @version        0.1
+// @description        レトロスキンブログでアメンバー記事を探す
+// @author        Ameba Blog User
+// @match        https://ameblo.jp/*
+// @icon        https://www.google.com/s2/favicons?sz=64&domain=ameblo.jp
+// @grant        none
+// ==/UserScript==
+
+
+if(!location.hash){ // #（ハッシュ）がないURLで開かれた場合
+    let end_call=0;
+    let skintype; // スキンタイプの判別
+    let skin_code=document.documentElement.getAttribute('data-base-skin-code');
+    if(skin_code=='uranus'){
+        skintype='N'; }
+    if(skin_code=='new'){
+        skintype='O'; }
+    if(skin_code=='default'){
+        skintype='R'; }
+
+
+    let target=document.querySelector('head');
+    let monitor=new MutationObserver(main);
+    monitor.observe(target, { childList: true });
+
+    main();
+
+    function main(){
+        let list_page; // 記事リストの現在の検索対象ページ
+        let locate_num=location.href.split('/entrylist')[1];
+        if(!locate_num){ // リストページ以外を開いた場合
+            list_page=0; }
+        else{
+            list_page=(locate_num.replace(/[^0-9]/g, ''));
+            if(list_page==''){ // リストの最初のページ
+                list_page=1; }}
+
+
+        let user_id=location.href.split('/')[3];
+
+        let panel=
+            '<div id="sfap_panel">'+
+            '<span id="sfap_span">アメンバー記事検索　　'+
+            'デスクトップ左側に対象のウインドウ列を表示します</span>'+
+            '<div id="sfap_inner">'+
+            '<span><span class="next_post">　　　　</span></span>'+
+            '<input id="search_sfap" type="submit" value="検索">'+
+            '<input id="end_sfap" type="submit" value="検索を終了">'+
+            '</div>'+
+            '<style>'+
+            '#sfap_panel { position: fixed; z-index: 4000; '+
+            'top: 60px;  left: calc(50% - 310px);'+
+            'font: bold 16px/24px Meiryo; color: #999; background: #fff; '+
+            'width: 620px; height: 80px; padding: 17px 5px 0; text-align: left; '+
+            'border: 1px solid #aaa; border-radius: 6px; box-sizing: content-box; '+
+            'overflow: hidden; box-shadow: 0 20px 30px rgb(0, 0, 0, .2); } '+
+            '#sfap_span { margin-left: 20px; white-space: nowrap; } '+
+            '#sfap_inner { position: absolute; bottom: 6px; left: 5px; padding: 0 20px; '+
+            'display: flex; align-items: center; '+
+            'height: 37px; width: 580px; background: #e4eef8; } '+
+            '#sfap_inner span { color: #333; padding: 3px 0 0; } '+
+            '#search_sfap, #end_sfap { position: absolute; bottom: 4px; '+
+            'font: bold 16px/16px Meiryo; padding: 2px 10px 0; height: 29px; '+
+            'color: #000; box-shadow: inset 0 0 0 40px rgb(40, 180, 250, 0.3); } '+
+            '#end_sfap { right: 25px; } '+
+            '#search_sfap { right: 170px; }'+
+            '</style></div>';
+
+        if(!document.querySelector('#sfap_panel')){
+            if(end_call==0){
+                document.body.insertAdjacentHTML('beforeend', panel); }}
+
+        serch_disp();
+        end_task();
+
+
+        let search_sfap=document.querySelector('#search_sfap');
+        if(search_sfap){
+            search_sfap.onclick=()=>{
+                if(user_id && check_last() && check_fit()){
+                    let lp=list_page*1;
+                    for(let k=lp; k<lp+20; k++){
+                        open_win(k); }
+
+                    list_page=lp+20;
+                    setTimeout(()=>{
+                        let goto='https://ameblo.jp/'+ user_id + '/entrylist-'+ list_page +'.html';
+                        window.location.href=goto;
+                    }, 1000); }
+
+                else{
+                    if(!check_last()){
+                        serch_end_disp(); }
+                    if(!check_fit()){
+                        serch_unfit_disp(); }}}}
+
+        //「.html#R」レトロタイプ　「.html#O」旧タイプを書換えて調査
+        function open_win(n){
+            let new_url='https://ameblo.jp/'+ user_id + '/entrylist-'+ n +'.html#'+ skintype;
+            let top=20+36*(n%20);
+            let win_option='top='+ top +',left=20,width=800,height=300'; // 🔲
+            window.open(new_url, n, win_option); } // 🔲
+
+
+        function serch_disp(){
+            let next_post=document.querySelector('.next_post');
+            if(next_post){
+                if(check_last() && check_fit()){
+                    next_post.textContent='次の20件を調べます　　'+
+                        'entrylist '+ list_page +' - '+ (list_page*1+ 19); }
+                else{
+                    if(!check_last()){
+                        serch_end_disp(); }
+                    if(!check_fit()){
+                        serch_unfit_disp(); }}}}
+
+
+        function serch_end_disp(){
+            let next_post=document.querySelector('.next_post');
+            if(next_post){
+                next_post.textContent='最終ページです'; }}
+
+
+        function serch_unfit_disp(){
+            let next_post=document.querySelector('.next_post');
+            if(next_post){
+                next_post.textContent='記事一覧の区分で entrylist を開いてください'; }}
+
+
+        function check_last(){
+            let pagingNext=document.querySelector('.pagingNext');
+            let nextPage=document.querySelector('.nextPage');
+            if(pagingNext || nextPage){ //「旧タイプ」「レトロタイプ」の両スキンに対応
+                return true; }
+            else{
+                return false; }}
+
+
+        function check_fit(){
+            let locate=location.href;
+            if(locate.includes('entrylist')){
+                return true; }
+            else{
+                return false; }}
+
+
+        function end_task(){
+            let end_sfap=document.querySelector('#end_sfap');
+            if(end_sfap){
+                end_sfap.onclick=()=>{
+                    end_call=1;
+                    if(document.querySelector('#sfap_panel')){
+                        document.querySelector('#sfap_panel').remove(); }}}}
+
+    } // main();
+
+} // #なしで開いた場合
+
+
+
+
+if(location.hash=='#R'){ // #R付きURLで開かれた場合
+    serch_task('.contentTitle'); }
+
+
+if(location.hash=='#O'){ // #N付きURLで開かれた場合
+    serch_task('.contentTitle'); }
+
+
+if(location.hash=='#N'){ // #N付きURLで開かれた場合
+    serch_task('[data-uranus-component="entryItemTitle"] a'); }
+
+
+
+function serch_task(title_link){
+    let locate=location.href;
+    let locate_str=locate.match(/entrylist-\d+.html/);
+    let locate_num;
+    if(locate_str){
+        locate_num=locate_str[0].replace(/[^0-9]/g, ''); }
+    else{
+        locate_num=1; }
+
+    let title_num;
+    let head_title=document.querySelector('head title');
+    if(head_title){
+        let title_str=head_title.textContent.match(/ -\d+ページ目$/);
+        if(title_str){
+            title_num=title_str[0].replace(/[^0-9]/g, ''); }
+        else{
+            title_num=1; }}
+
+    if(title_num==locate_num){
+        search(title_link); } // 調査を実行する
+    else{ // リスト末尾を超えて調査を指定した場合はサブウインドウを閉じる
+        window.close(); }
+
+
+    function search(link){
+        let selector=link;
+        let find=0;
+        let titles=document.querySelectorAll(selector);
+        for(let k=0; k<titles.length; k++){
+            let url=titles[k].getAttribute('href');
+            if(url.includes('amemberentry')){
+                find=1; // 発見した場合 サブウインドウを残す
+                break; }}
+
+        if(find==0){
+            window.close(); }} // アメンバー記事が無い場合 サブウインドウを閉じる
+
+} // serch_task()
+
+
